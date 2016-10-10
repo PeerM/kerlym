@@ -1,14 +1,14 @@
 #!/usr/bin/env python
-import networks
+from kerlym import networks
 from gym import envs
 import tensorflow as tf
 import keras.backend as K
 import numpy as np
-from worker import *
+from kerlym.worker import *
 from kerlym import preproc
 from kerlym.statbin import statbin
 import matplotlib.pyplot as plt
-import Queue
+import queue
 
 class DQN:
     def __init__(self, experiment="Breakout-v0", env=None, nthreads=16, nframes=1, epsilon=0.5, 
@@ -48,7 +48,7 @@ class DQN:
 
         self.render_rate_hz = 5.0
         self.render_ngames = 2
-        self.plot_q = Queue.Queue()
+        self.plot_q = queue.Queue()
 
         # set up output shape to be either pre-processed or not
         if not self.preprocessor == None:

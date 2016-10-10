@@ -2,8 +2,8 @@
 import numpy as np
 import pickle
 import gym,keras
-from .preproc import karpathy_preproc
-import networks, statbin
+from kerlym.preproc import karpathy_preproc
+from kerlym import networks, statbin
 import matplotlib.pyplot as plt
 
 # This policy gradient implementation is an adaptation of Karpathy's GIST

@@ -1,6 +1,6 @@
-#!/usr/bin/env python
+#!/usr/bin/env python3
 import os
-from setuptools import setup
+from setuptools import setup, find_packages
 def read(fname):
     return open(os.path.join(os.path.dirname(__file__), fname)).read()
 
@@ -13,7 +13,7 @@ setup(
     license = "MIT",
     keywords = "keras reinforcement learning gym",
     url = "http://www.kerlym.com",
-    packages=['kerlym','kerlym/dqn', 'kerlym/a3c'],
-    long_description=read('README.md'),
-    scripts=['kerlym/kerlym'],
+    packages = find_packages(), #['kerlym'], #'kerlym/dqn', 'kerlym/a3c'
+    long_description = read('README.md'),
+    scripts = ['bin/kerlym'],
 )

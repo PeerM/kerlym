@@ -3,22 +3,20 @@ import networks
 from gym import envs
 import tensorflow as tf
 import keras.backend as K
-import keras
 import numpy as np
 from worker import *
 from kerlym import preproc
 from kerlym.statbin import statbin
 import matplotlib.pyplot as plt
 import Queue
-import global_params
 
-class A3C:
-    def __init__(self, experiment="Breakout-v0", env=None, nthreads=16, nframes=1, epsilon=0.5,
-            enable_plots=False, render=False, learning_rate=1e-4,
-            modelfactory= networks.simple_cnn, difference_obs=True,
+class DQN:
+    def __init__(self, experiment="Breakout-v0", env=None, nthreads=16, nframes=1, epsilon=0.5, 
+            enable_plots=False, render=False, learning_rate=1e-4, 
+            modelfactory= networks.simple_cnn, difference_obs=True, 
             preprocessor = preproc.karpathy_preproc, discount=0.99,
             batch_size = 32, epsilon_min=0.05, epsilon_schedule=None,
-            stats_rate = 10,
+            stats_rate = 10, 
             **kwargs ):
         self.kwargs = kwargs
         self.experiment = experiment
@@ -39,7 +37,7 @@ class A3C:
         self.target_network_update_frequency = 10000
         self.T = 0
         self.TMAX = 80000000
-        self.checkpoint_interval = 10
+        self.checkpoint_interval = 600
         self.checkpoint_dir = "/tmp/"
         self.enable_plots = enable_plots
         self.stats_rate = stats_rate
@@ -47,7 +45,6 @@ class A3C:
         self.next_plot = 0
         self.e = 0
         self.render = render
-        self.global_params = global_params.global_params()
 
         self.render_rate_hz = 5.0
         self.render_ngames = 2
@@ -55,13 +52,13 @@ class A3C:
 
         # set up output shape to be either pre-processed or not
         if not self.preprocessor == None:
-            print self.env[0].observation_space.shape
+            print(self.env[0].observation_space.shape)
             o = self.preprocessor(np.zeros( self.env[0].observation_space.shape ) )
             self.input_dim_orig = [self.nframes]+list(o.shape)
         else:
             self.input_dim_orig = [self.nframes]+list(self.env[0].observation_space.shape)
         self.input_dim = np.product( self.input_dim_orig )
-        print self.input_dim, self.input_dim_orig
+        print(self.input_dim, self.input_dim_orig)
 
         # set up plotting storage
         self.stats = None
@@ -82,70 +79,44 @@ class A3C:
 
 
     def setup_graphs(self):
+        # Create shared deep q network
+        s, q_network = self.model_factory(self, self.env[0], **self.kwargs)
+        network_params = q_network.trainable_weights
+        q_values = q_network(s)
 
-        # update network weights...
-        set_weights_v = lambda x: [value_network_params[i].assign(x[i]) for i in range(len(x))]
-        set_weights_p = lambda x: [policy_network_params[i].assign(x[i]) for i in range(len(x))]
-        
-        # Create shared network
-        s, policy_network, value_network = self.model_factory(self, self.env[0], **self.kwargs)
-        policy_network_params = policy_network.trainable_weights
-        value_network_params = value_network.trainable_weights
-        pi_values = policy_network(s)
-        V_values = value_network(s)
+        # Create shared target network
+        st, target_q_network = self.model_factory(self, self.env[0])
+        target_network_params = target_q_network.trainable_weights
+        target_q_values = target_q_network(st)
 
-        # Define A3C cost and gradient update equations
+        # Op for periodically updating target network with online network weights
+        reset_target_network_params = [target_network_params[i].assign(network_params[i]) for i in range(len(target_network_params))]
+
+        # Define cost and gradient update op
         a = tf.placeholder("float", [None, self.env[0].action_space.n])
-        R = tf.placeholder("float", [None, 1])
-        action_pi_values = tf.reduce_sum(tf.mul(pi_values, a), reduction_indices=1)
-
-        # policy network update
-        cost_pi = -K.log( tf.reduce_sum(  action_pi_values ) ) * (R-V_values)
-        #optimizer_pi = keras.optimizers.Adam(self.learning_rate, clipvalue=1e3)
-        optimizer_pi = tf.train.RMSPropOptimizer(self.learning_rate)
-        grad_update_pi = optimizer_pi.minimize(cost_pi, var_list=policy_network_params)
-        grad_pi = K.gradients(cost_pi, policy_network_params)
-
-        # value network update
-        cost_V = tf.reduce_mean( tf.square( R - V_values ) )
-        #optimizer_V = keras.optimizers.Adam(self.learning_rate, clipvalue=1e3)
-        optimizer_V = tf.train.RMSPropOptimizer(self.learning_rate)
-        grad_update_V = optimizer_V.minimize(cost_V, var_list=value_network_params)
-        grad_V = K.gradients(cost_V, value_network_params)
-
-        # store variables and update functions for access
-        self.graph_ops = {
-                 "R" : R,
-                 "s" : s,
-                 "pi_values" : pi_values,
-                 "V_values" : V_values,
+        y = tf.placeholder("float", [None])
+        action_q_values = tf.reduce_sum(tf.mul(q_values, a), reduction_indices=1)
+        cost = tf.reduce_mean(tf.square(y - action_q_values))
+        optimizer = tf.train.AdamOptimizer(self.learning_rate)
+        grad_update = optimizer.minimize(cost, var_list=network_params)
+    
+        self.graph_ops = {"s" : s,
+                 "q_values" : q_values,
+                 "st" : st,
+                 "target_q_values" : target_q_values,
+                 "reset_target_network_params" : reset_target_network_params,
                  "a" : a,
-
-                 # policy network 
-                 "grad_update_pi" : grad_update_pi,
-                 "cost_pi" : cost_pi,
-                 "grad_pi" : grad_pi,
-
-                 # value network 
-                 "grad_update_V" : grad_update_V,
-                 "cost_V" : cost_V,
-                 "grad_V" : grad_V,
-
-                 "w_p" : policy_network.get_weights,
-                 "w_v" : value_network.get_weights,
-                 "set_weights_p" : set_weights_p,
-                 "set_weights_v" : set_weights_v,
+                 "y" : y,
+                 "grad_update" : grad_update,
+                 "cost": cost 
                 }
 
 
     def train(self):
         # Initialize target network weights
+        self.session.run(self.graph_ops["reset_target_network_params"])
         self.session.run(tf.initialize_all_variables())
-        threads = map(lambda tid: a3c_learner(self, tid), range(0,self.nthreads))
-
-        # start global params thread
-        self.global_params.start()
-
+        threads = map(lambda tid: dqn_learner(self, tid), range(0,self.nthreads))
         # start actor-learners
         for t in threads:
             t.start()
@@ -160,7 +131,7 @@ class A3C:
             self.pt = plotter_thread(self)
             self.pt.start()
 
-        print "Waiting for threads to finish..."
+        print("Waiting for threads to finish...")
         for t in threads:
             t.join()
 
@@ -168,15 +139,11 @@ class A3C:
         if self.render:
             self.rt.done = True
             self.rt.join()
-
+        
         # Shut down plotting
         if self.enable_plots:
             self.pt.done = True
             self.pt.join()
-
-        # stop global params thread
-        self.global_params.finished = True
-        self.global_params.join()
 
 
     def prepare_obs(self, obs):
@@ -191,7 +158,7 @@ class A3C:
 
     def update_epsilon(self):
         if not self.epsilon_schedule == None:
-            self.epsilon = max(self.epsilon_min,
+            self.epsilon = max(self.epsilon_min, 
                                self.epsilon_schedule(self.T, self.epsilon))
 
     def update_stats_threadsafe(self, stats, tid=0):
@@ -207,7 +174,7 @@ class A3C:
         # only plot from thread 0
         if self.stats == None or tid > 0:
             return
-
+        
         # plot if its time
         if(self.e >= self.next_plot):
             self.next_plot = self.e + self.stats_rate
@@ -215,7 +182,7 @@ class A3C:
                 from IPython import display
                 display.clear_output(wait=True)
             fig = plt.figure(1)
-            fig.canvas.set_window_title("A3C Training Stats for %s"%(self.experiment))
+            fig.canvas.set_window_title("DQN Training Stats for %s"%(self.experiment))
             plt.clf()
             plt.subplot(2,2,1)
             self.stats["tr"].plot()
@@ -249,3 +216,6 @@ class A3C:
             plt.show(block=False)
             plt.draw()
             plt.pause(0.001)
+
+              
+

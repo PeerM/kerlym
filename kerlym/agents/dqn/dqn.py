@@ -1,5 +1,4 @@
-#!/usr/bin/env python
-from kerlym import networks
+from kerlym.agents.dqn import networks
 from gym import envs
 import tensorflow as tf
 import keras.backend as K

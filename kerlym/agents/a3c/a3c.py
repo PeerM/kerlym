@@ -1,4 +1,4 @@
-from kerlym import networks
+from kerlym.agents.a3c import networks
 from gym import envs
 import tensorflow as tf
 import keras.backend as K

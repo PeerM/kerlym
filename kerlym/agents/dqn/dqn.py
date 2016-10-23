@@ -22,7 +22,7 @@ class DQN:
         if env==None:
             env=lambda: envs.make(self.experiment)
         self.nthreads = nthreads
-        self.env = map(lambda x: env(), range(0, self.nthreads))
+        self.env = list(map(lambda x: env(), range(0, self.nthreads)))
         self.model_factory = modelfactory
         self.nframes = nframes
         self.learning_rate = learning_rate

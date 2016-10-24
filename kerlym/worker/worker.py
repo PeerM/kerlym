@@ -9,6 +9,7 @@ class dqn_learner(threading.Thread):
         self.parent = parent
         self.tid = tid
         self.env = self.parent.env[tid]
+        self.daemon = True
 
     def run(self):
         t = 0
@@ -119,6 +120,7 @@ class render_thread(threading.Thread):
         self.done = False
         self.envs = envs
         self.sleeptime = 1.0/updates_per_sec
+        self.daemon = True
 
     def run(self):
         while not self.done:
@@ -131,6 +133,7 @@ class plotter_thread(threading.Thread):
         threading.Thread.__init__(self)
         self.parent = parent
         self.done = False
+        self.daemon = True
 
     def run(self):
         while not self.done:

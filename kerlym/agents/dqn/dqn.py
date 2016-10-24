@@ -115,7 +115,7 @@ class DQN:
         # Initialize target network weights
         self.session.run(self.graph_ops["reset_target_network_params"])
         self.session.run(tf.initialize_all_variables())
-        threads = map(lambda tid: dqn_learner(self, tid), range(0,self.nthreads))
+        threads = list(map(lambda tid: dqn_learner(self, tid), range(0,self.nthreads)))
         # start actor-learners
         for t in threads:
             t.start()

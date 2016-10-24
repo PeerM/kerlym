@@ -1,3 +1,6 @@
+# This is a fork of KEras
+For now the only changes are for the port to python 3
+
 # KEras Reinforcement Learning gYM agents, KeRLym
 
 This repo is intended to host a handful of reinforcement learning agents implemented using the Keras (http://keras.io/) deep learning library for Theano and Tensorflow.

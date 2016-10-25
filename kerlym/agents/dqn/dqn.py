@@ -130,9 +130,12 @@ class DQN:
             self.pt = plotter_thread(self)
             self.pt.start()
 
-        print("Waiting for threads to finish...")
-        for t in threads:
-            t.join()
+        try:
+            print("Waiting for threads to finish...")
+            for t in threads:
+                t.join()
+        except KeyboardInterrupt:
+            pass
 
         # Shut down rendering
         if self.render:

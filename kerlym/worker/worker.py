@@ -121,6 +121,7 @@ class render_thread(threading.Thread):
         self.envs = envs
         self.sleeptime = 1.0/updates_per_sec
         self.daemon = True
+        self.name = "render"
 
     def run(self):
         while not self.done:
@@ -134,6 +135,7 @@ class plotter_thread(threading.Thread):
         self.parent = parent
         self.done = False
         self.daemon = True
+        self.name = "plotter"
 
     def run(self):
         while not self.done:

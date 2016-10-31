@@ -5,6 +5,7 @@ import keras.backend as K
 import keras
 import numpy as np
 from kerlym import worker
+from kerlym.agents.a3c.worker import a3c_learner,plotter_thread,render_thread
 from kerlym import preproc
 from kerlym.statbin import statbin
 import matplotlib.pyplot as plt
@@ -24,7 +25,7 @@ class A3C:
         if env==None:
             env=lambda: envs.make(self.experiment)
         self.nthreads = nthreads
-        self.env = map(lambda x: env(), range(0, self.nthreads))
+        self.env = list(map(lambda x: env(), range(0, self.nthreads)))
         self.model_factory = modelfactory
         self.nframes = nframes
         self.learning_rate = learning_rate
@@ -85,7 +86,7 @@ class A3C:
         # update network weights...
         set_weights_v = lambda x: [value_network_params[i].assign(x[i]) for i in range(len(x))]
         set_weights_p = lambda x: [policy_network_params[i].assign(x[i]) for i in range(len(x))]
-        
+
         # Create shared network
         s, policy_network, value_network = self.model_factory(self, self.env[0], **self.kwargs)
         policy_network_params = policy_network.trainable_weights
@@ -120,12 +121,12 @@ class A3C:
                  "V_values" : V_values,
                  "a" : a,
 
-                 # policy network 
+                 # policy network
                  "grad_update_pi" : grad_update_pi,
                  "cost_pi" : cost_pi,
                  "grad_pi" : grad_pi,
 
-                 # value network 
+                 # value network
                  "grad_update_V" : grad_update_V,
                  "cost_V" : cost_V,
                  "grad_V" : grad_V,
